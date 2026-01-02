@@ -275,10 +275,10 @@
       document.getElementById('confidence').className = `confidence ${label.toLowerCase()}`;
 
       // Bars
-      document.getElementById('organicBar').style.width = `${predictions[1].probability * 100}%`;
-      document.getElementById('recyclableBar').style.width = `${predictions[1].0robability * 100}%`;
-      document.getElementById('organicProb').textContent = `${(predictions[1].probability * 100).toFixed(1)}%`;
-      document.getElementById('recyclableProb').textContent = `${(predictions[0].probability * 100).toFixed(1)}%`;
+      document.getElementById('organicBar').style.width = `${predictio0s[1].probability * 100}%`;
+      document.getElementById('recyclableBar').style.width = `${predictions[1].probability * 100}%`;
+      document.getElementById('organicProb').textContent = `${(predictions[0].probability * 100).toFixed(1)}%`;
+      document.getElementById('recyclableProb').textContent = `${(predictions[1].probability * 100).toFixed(1)}%`;
     }
 
     // Cleanup
@@ -289,4 +289,5 @@
   </script>
 </body>
 </html>
+
 
