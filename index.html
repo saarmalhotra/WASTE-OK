@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Waste Classifier AI - Recyclable vs Organic</title>
+  <!-- TensorFlow.js & Teachable Machine -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.21.0/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@0.8/dist/teachablemachine-image.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #333;
+    }
+    .container {
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(10px);
+      border-radius: 20px;
+      padding: 40px;
+      max-width: 500px;
+      width: 90%;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+      text-align: center;
+    }
+    h1 {
+      font-size: 2rem;
+      margin-bottom: 10px;
+      background: linear-gradient(45deg, #4CAF50, #2196F3);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .subtitle {
+      color: #666;
+      margin-bottom: 30px;
+      font-size: 1.1rem;
+    }
+    .mode-buttons {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+      justify-content: center;
+    }
+    button {
+      padding: 12px 24px;
+      border: none;
+      border-radius: 50px;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      font-weight: 600;
+    }
+    .mode-btn {
+      background: #f0f0f0;
+      color: #333;
+      flex: 1;
+    }
+    .mode-btn.active {
+      background: linear-gradient(45deg, #4CAF50, #45a049);
+      color: white;
+      transform: translateY(-2px);
+      box-shadow: 0 5px 15px rgba(76, 175, 80, 0.4);
+    }
+    #startCamBtn, #uploadBtn {
+      background: linear-gradient(45deg, #4CAF50, #45a049);
+      color: white;
+      width: 100%;
+      margin-bottom: 20px;
+    }
+    #startCamBtn:hover, #uploadBtn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 20px rgba(76, 175, 80, 0.3);
+    }
+    .input-area {
+      margin-bottom: 30px;
+    }
+    #fileInput {
+      display: none;
+    }
+    #webcamContainer, #imageContainer {
+      display: none;
+      margin: 20px 0;
+      border-radius: 15px;
+      overflow: hidden;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    }
+    #webcam, #uploadedImage {
+      width: 100%;
+      height: 250px;
+      object-fit: cover;
+    }
+    .results {
+      background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+      border-radius: 15px;
+      padding: 20px;
+      margin-top: 20px;
+    }
+    .prediction {
+      font-size: 1.3rem;
+      font-weight: bold;
+      margin-bottom: 10px;
+    }
+    .confidence {
+      font-size: 3rem;
+      font-weight: 800;
+    }
+    .organic { color: #4CAF50; }
+    .recyclable { color: #2196F3; }
+    .bar-container {
+      background: #e0e0e0;
+      height: 20px;
+      border-radius: 10px;
+      overflow: hidden;
+      margin: 10px 0;
+    }
+    .bar {
+      height: 100%;
+      transition: width 0.5s ease;
+      border-radius: 10px;
+    }
+    .bar-organic { background: linear-gradient(90deg, #4CAF50, #8BC34A); }
+    .bar-recyclable { background: linear-gradient(90deg, #2196F3, #42A5F5); }
+    .label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.9rem;
+      color: #666;
+      margin-bottom: 5px;
+    }
+    @media (max-width: 600px) {
+      .container { padding: 30px 20px; }
+      h1 { font-size: 1.6rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Waste AI Classifier</h1>
+    <p class="subtitle">Classify recyclable vs organic waste using camera or upload</p>
+    
+    <div class="mode-buttons">
+      <button class="mode-btn active" id="camMode">📹 Live Camera</button>
+      <button class="mode-btn" id="uploadMode">📁 Upload Image</button>
+    </div>
+
+    <div class="input-area">
+      <button id="startCamBtn">🔓 Enable Camera</button>
+      <input type="file" id="fileInput" accept="image/*">
+      <button id="uploadBtn">📁 Choose Image</button>
+    </div>
+
+    <div id="webcamContainer">
+      <video id="webcam" autoplay muted playsinline></video>
+    </div>
+    <div id="imageContainer">
+      <img id="uploadedImage" alt="Uploaded image">
+    </div>
+
+    <div class="results" id="results">
+      <div class="prediction" id="prediction">-</div>
+      <div class="confidence" id="confidence">-</div>
+      <div id="bars">
+        <div class="label"><span>Organic</span><span id="organicProb">-</span></div>
+        <div class="bar-container"><div class="bar bar-organic" id="organicBar" style="width:0%"></div></div>
+        <div class="label"><span>Recyclable</span><span id="recyclableProb">-</span></div>
+        <div class="bar-container"><div class="bar bar-recyclable" id="recyclableBar" style="width:0%"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const MODEL_URL = 'https://teachablemachine.withgoogle.com/models/rfyLproPP/';
+    
+    let model, webcam, isCamMode = true, isModelLoaded = false;
+    const classes = ['Organic', 'Recyclable'];  // Update based on your model classes
+
+    // Mode switching
+    document.getElementById('camMode').onclick = () => switchMode(true);
+    document.getElementById('uploadMode').onclick = () => switchMode(false);
+
+    function switchMode(cam) {
+      isCamMode = cam;
+      document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
+      document.getElementById(cam ? 'camMode' : 'uploadMode').classList.add('active');
+      document.getElementById('webcamContainer').style.display = 'none';
+      document.getElementById('imageContainer').style.display = 'none';
+      document.getElementById('startCamBtn').style.display = cam ? 'block' : 'none';
+      document.getElementById('uploadBtn').style.display = cam ? 'none' : 'block';
+      stopCam();
+    }
+
+    // Load model
+    async function loadModel() {
+      if (isModelLoaded) return;
+      try {
+        model = await tmImage.load(MODEL_URL + 'model.json', MODEL_URL + 'metadata.json');
+        isModelLoaded = true;
+        console.log('Model loaded!');
+      } catch (e) {
+        alert('Failed to load model. Check console.');
+        console.error(e);
+      }
+    }
+
+    // Camera setup
+    document.getElementById('startCamBtn').onclick = async () => {
+      await loadModel();
+      const video = document.getElementById('webcam');
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 320, height: 240 } });
+        video.srcObject = stream;
+        video.onloadedmetadata = () => {
+          video.play();
+          document.getElementById('webcamContainer').style.display = 'block';
+          predictLoop();
+        };
+      } catch (e) {
+        alert('Camera access denied. Allow access and retry.');
+      }
+    };
+
+    function stopCam() {
+      const video = document.getElementById('webcam');
+      if (video.srcObject) {
+        video.srcObject.getTracks().forEach(track => track.stop());
+      }
+    }
+
+    let rafId;
+    async function predictLoop() {
+      if (!model || !isCamMode) return;
+      const predictions = await model.predict(document.getElementById('webcam'));
+      updateUI(predictions);
+      rafId = requestAnimationFrame(predictLoop);
+    }
+
+    // Upload
+    document.getElementById('uploadBtn').onclick = () => document.getElementById('fileInput').click();
+    document.getElementById('fileInput').onchange = async (e) => {
+      await loadModel();
+      const file = e.target.files[0];
+      if (file) {
+        const img = document.getElementById('uploadedImage');
+        img.src = URL.createObjectURL(file);
+        img.onload = async () => {
+          document.getElementById('imageContainer').style.display = 'block';
+          const predictions = await model.predict(img);
+          updateUI(predictions);
+        };
+      }
+    };
+
+    function updateUI(predictions) {
+      let maxIdx = 0, maxProb = 0;
+      predictions.forEach((pred, i) => {
+        if (pred.probability > maxProb) {
+          maxProb = pred.probability;
+          maxIdx = i;
+        }
+      });
+
+      const label = classes[maxIdx];
+      const conf = (maxProb * 100).toFixed(1);
+      const otherProb = predictions[1 - maxIdx].probability * 100;
+
+      document.getElementById('prediction').textContent = label;
+      document.getElementById('prediction').className = `prediction ${label.toLowerCase()}`;
+      document.getElementById('confidence').textContent = `${conf}%`;
+      document.getElementById('confidence').className = `confidence ${label.toLowerCase()}`;
+
+      // Bars
+      document.getElementById('organicBar').style.width = `${predictions[0].probability * 100}%`;
+      document.getElementById('recyclableBar').style.width = `${predictions[1].probability * 100}%`;
+      document.getElementById('organicProb').textContent = `${(predictions[0].probability * 100).toFixed(1)}%`;
+      document.getElementById('recyclableProb').textContent = `${(predictions[1].probability * 100).toFixed(1)}%`;
+    }
+
+    // Cleanup
+    window.onbeforeunload = () => {
+      stopCam();
+      if (rafId) cancelAnimationFrame(rafId);
+    };
+  </script>
+</body>
+</html>
